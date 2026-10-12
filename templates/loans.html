@@ -1,0 +1,199 @@
+<div class="container-fluid p-2">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="fw-bold mb-1"><i class="fas fa-hand-holding-usd text-primary me-2"></i> إدارة القروض والتمويل البنكي (Loan Amortization)</h4>
+            <p class="text-muted mb-0">حاسبة وجدولة القروض (فائدة ثابتة / متناقصة) مع التوليد الآلي لقيود الاستلام وسداد الأقساط وفصل الفائدة عن أصل الدين</p>
+        </div>
+    </div>
+
+    <!-- Loan Calculator Card -->
+    <div class="card p-4 shadow-sm border-0 mb-4 bg-light">
+        <h5 class="fw-bold mb-3"><i class="fas fa-calculator text-primary me-2"></i> حاسبة الجدولة وإنشاء قرض جديد</h5>
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label fw-bold">مبلغ القرض (شيكل):</label>
+                <input type="number" step="1000" id="loan-amount" class="form-control" value="50000" placeholder="50000">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-bold">الفائدة السنوية %:</label>
+                <input type="number" step="0.1" id="loan-rate" class="form-control" value="5.5" placeholder="5.5">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-bold">المدة (بالأشهر):</label>
+                <input type="number" step="1" id="loan-term" class="form-control" value="12" placeholder="12">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-bold">نظام الفائدة:</label>
+                <select id="loan-type" class="form-select">
+                    <option value="Fixed" selected>أقساط ثابتة (Fixed Amortization)</option>
+                    <option value="Reducing">أصل ثابت وفائدة متناقصة (Reducing)</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-primary w-100 fw-bold" onclick="previewLoanSchedule()">
+                    <i class="fas fa-play me-1"></i> احتساب الجدول
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Schedule Preview Container -->
+    <div id="loan-preview-section" class="card shadow-sm border-0 mb-4 d-none">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+            <h5 class="fw-bold mb-0 text-primary"><i class="fas fa-calendar-alt me-2"></i> جدول سداد الأقساط التقديري</h5>
+            <button class="btn btn-success fw-bold" onclick="confirmCreateLoan()">
+                <i class="fas fa-check-circle me-1"></i> اعتماد القرض وترحيل قيد الاستلام في البنك
+            </button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped align-middle mb-0 text-center">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>رقم القسط</th>
+                            <th>أصل الدين (Principal)</th>
+                            <th>الفائدة الشهرية (Interest)</th>
+                            <th>إجمالي القسط الشهري</th>
+                            <th>الرصيد المتبقي</th>
+                        </tr>
+                    </thead>
+                    <tbody id="loan-preview-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Existing Loans Table -->
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-white py-3">
+            <h5 class="fw-bold mb-0"><i class="fas fa-list me-2"></i> القروض والتسهيلات المسجلة بالنظام</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 text-center">
+                    <thead class="table-light">
+                        <tr>
+                            <th>رقم القرض</th>
+                            <th>المقترض</th>
+                            <th>مبلغ التمويل</th>
+                            <th>الفائدة %</th>
+                            <th>المدة</th>
+                            <th>إجمالي الفائدة</th>
+                            <th>الأقساط المسددة</th>
+                            <th>الحالة</th>
+                        </tr>
+                    </thead>
+                    <tbody id="loans-history-tbody">
+                        <tr><td colspan="8" class="py-4 text-muted">جاري تحميل القروض...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function loadLoansHistory() {
+    try {
+        const res = await fetch('/api/loans');
+        const list = await res.json();
+        const tbody = document.getElementById('loans-history-tbody');
+
+        if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="py-4 text-muted">لا توجد قروض مسجلة حالياً</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = list.map(l => `
+            <tr>
+                <td class="font-monospace fw-bold text-primary">LOAN-#${l.id}</td>
+                <td>${l.borrower_name}</td>
+                <td class="fw-bold">${Number(l.loan_amount).toLocaleString('en-US', {minimumFractionDigits: 2})} ₪</td>
+                <td>${l.interest_rate}%</td>
+                <td>${l.term_months} شهر</td>
+                <td class="text-danger fw-bold">${Number(l.total_interest).toLocaleString('en-US', {minimumFractionDigits: 2})} ₪</td>
+                <td><span class="badge bg-light text-dark border">${l.paid_installments} من ${l.total_installments}</span></td>
+                <td><span class="badge ${l.status === 'Active' ? 'bg-primary' : 'bg-success'}">${l.status === 'Active' ? 'نشط وساري' : 'مسدد بالكامل'}</span></td>
+            </tr>
+        `).join('');
+    } catch(e) {
+        document.getElementById('loans-history-tbody').innerHTML = '<tr><td colspan="8" class="text-danger py-4">خطأ في تحميل القروض</td></tr>';
+    }
+}
+
+async function previewLoanSchedule() {
+    const amount = parseFloat(document.getElementById('loan-amount').value);
+    const rate = parseFloat(document.getElementById('loan-rate').value);
+    const term = parseInt(document.getElementById('loan-term').value);
+    const type = document.getElementById('loan-type').value;
+
+    if (!amount || !term) {
+        alert("يرجى إدخال مبلغ صحيح ومدة بالأشهر!");
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/loans/preview', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                loan_amount: amount,
+                interest_rate: rate,
+                term_months: term,
+                loan_type: type
+            })
+        });
+        const data = await res.json();
+        const tbody = document.getElementById('loan-preview-tbody');
+
+        tbody.innerHTML = data.schedule.map(s => `
+            <tr>
+                <td class="fw-bold font-monospace">القسط #${s.payment_number}</td>
+                <td class="text-primary fw-bold">${s.principal_amount.toFixed(2)} ₪</td>
+                <td class="text-danger fw-bold">${s.interest_amount.toFixed(2)} ₪</td>
+                <td class="text-success fw-bold fs-6">${s.total_payment.toFixed(2)} ₪</td>
+                <td>${s.remaining_balance.toFixed(2)} ₪</td>
+            </tr>
+        `).join('');
+
+        document.getElementById('loan-preview-section').classList.remove('d-none');
+    } catch(e) {
+        alert("❌ خطأ في احتساب جدول القرض");
+    }
+}
+
+async function confirmCreateLoan() {
+    const amount = parseFloat(document.getElementById('loan-amount').value);
+    const rate = parseFloat(document.getElementById('loan-rate').value);
+    const term = parseInt(document.getElementById('loan-term').value);
+    const type = document.getElementById('loan-type').value;
+
+    if (!confirm(`هل أنت متأكد من رغبتك في اعتماد تمويل القرض بقيمة ${amount.toLocaleString()} ₪ وإيداعه في الحساب البنكي؟`)) return;
+
+    try {
+        const res = await fetch('/api/loans', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                loan_amount: amount,
+                interest_rate: rate,
+                term_months: term,
+                loan_type: type,
+                borrower_name: 'الشركة'
+            })
+        });
+        const d = await res.json();
+        if (res.ok) {
+            alert("✅ " + d.message);
+            document.getElementById('loan-preview-section').classList.add('d-none');
+            loadLoansHistory();
+        } else {
+            alert("❌ خطأ: " + d.error);
+        }
+    } catch(e) {
+        alert("❌ خطأ بالاتصال");
+    }
+}
+
+loadLoansHistory();
+</script>

@@ -1,0 +1,261 @@
+<div class="container-fluid p-2">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="fw-bold mb-1"><i class="fas fa-boxes text-primary me-2"></i> إدارة المخازن والأصناف (Inventory Management)</h4>
+            <p class="text-muted mb-0">متابعة الأرصدة، تكلفة البضاعة المباعة (COGS)، تنبيهات إعادة الطلب، وتسويات الجرد الدوري</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-success" onclick="openNewItemModal()">
+                <i class="fas fa-plus me-1"></i> إضافة صنف جديد
+            </button>
+            <button class="btn btn-warning text-dark fw-bold" onclick="openInventoryCountModal()">
+                <i class="fas fa-clipboard-check me-1"></i> تسوية جرد مخزني
+            </button>
+        </div>
+    </div>
+
+    <!-- Items Table -->
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>الرمز (SKU)</th>
+                            <th>اسم الصنف</th>
+                            <th>التصنيف</th>
+                            <th>سعر التكلفة</th>
+                            <th>سعر البيع</th>
+                            <th>الرصيد الحالي</th>
+                            <th>حد الأمان</th>
+                            <th>حالة المخزون</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventory-table-body">
+                        <tr><td colspan="8" class="text-center py-4">جاري تحميل الأصناف...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: New Item -->
+<div class="modal fade" id="newItemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-box me-2"></i> بطاقة صنف جديد</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="newItemForm">
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-5">
+                            <label class="form-label fw-bold">رمز الصنف (SKU):</label>
+                            <input type="text" id="itm-sku" class="form-control" required placeholder="مثال: PRD-005">
+                        </div>
+                        <div class="col-md-7">
+                            <label class="form-label fw-bold">اسم الصنف بالعربية:</label>
+                            <input type="text" id="itm-name" class="form-control" required placeholder="اسم الصنف...">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">التصنيف:</label>
+                            <input type="text" id="itm-cat" class="form-control" value="عام">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">الوحدة:</label>
+                            <input type="text" id="itm-unit" class="form-control" value="قطعة">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">سعر التكلفة (شراء):</label>
+                            <input type="number" step="0.01" id="itm-cost" class="form-control" required placeholder="0.00">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">سعر البيع المقترح:</label>
+                            <input type="number" step="0.01" id="itm-price" class="form-control" required placeholder="0.00">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">الرصيد الافتتاحي:</label>
+                            <input type="number" step="1" id="itm-stock" class="form-control" value="0">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">حد إعادة الطلب (الأمان):</label>
+                            <input type="number" step="1" id="itm-min" class="form-control" value="5">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-success" onclick="submitNewItem()">
+                    <i class="fas fa-save me-1"></i> حفظ الصنف
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Inventory Count Adjustment -->
+<div class="modal fade" id="countModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="fas fa-clipboard-check me-2"></i> تسوية جرد مخزني فعلي</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="countForm">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">اختر الصنف المراد جرده:</label>
+                        <select id="count-item-id" class="form-select" required>
+                            <!-- populated -->
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">الكمية الفعلية الموجودة على الرف:</label>
+                        <input type="number" step="1" id="count-actual-qty" class="form-control form-control-lg" required placeholder="0">
+                        <small class="text-muted">سيقوم النظام بحساب الفارق وترحيل قيد عجز أو فائض جرد آلياً.</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-warning text-dark fw-bold" onclick="submitInventoryCount()">
+                    <i class="fas fa-check-circle me-1"></i> اعتماد تسوية الجرد
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let itemsDataCache = [];
+
+async function loadInventoryItems() {
+    try {
+        const res = await fetch('/api/inventory/items');
+        itemsDataCache = await res.json();
+        const tbody = document.getElementById('inventory-table-body');
+
+        if (itemsDataCache.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">لا توجد أصناف بالمخزن</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = itemsDataCache.map(it => {
+            const stockStatus = it.is_low_stock 
+                ? '<span class="badge bg-danger">مخزون منخفض ⚠️</span>' 
+                : '<span class="badge bg-success">متوفر وجيد ✅</span>';
+
+            return `
+                <tr>
+                    <td class="fw-bold font-monospace text-primary">${it.sku}</td>
+                    <td class="fw-bold">${it.name_ar}</td>
+                    <td><span class="badge bg-light text-dark border">${it.category}</span></td>
+                    <td>${Number(it.purchase_price).toFixed(2)} ₪</td>
+                    <td class="fw-bold text-success">${Number(it.sale_price).toFixed(2)} ₪</td>
+                    <td class="fw-bold fs-6">${it.current_stock} ${it.unit}</td>
+                    <td>${it.min_stock_level}</td>
+                    <td>${stockStatus}</td>
+                </tr>
+            `;
+        }).join('');
+    } catch(e) {
+        document.getElementById('inventory-table-body').innerHTML = '<tr><td colspan="8" class="text-center text-danger">خطأ في تحميل المخزون</td></tr>';
+    }
+}
+
+function openNewItemModal() {
+    document.getElementById('newItemForm').reset();
+    new bootstrap.Modal(document.getElementById('newItemModal')).show();
+}
+
+function openInventoryCountModal() {
+    const select = document.getElementById('count-item-id');
+    select.innerHTML = itemsDataCache.map(it => `<option value="${it.id}">${it.name_ar} (الحالي بالدفتر: ${it.current_stock})</option>`).join('');
+    new bootstrap.Modal(document.getElementById('countModal')).show();
+}
+
+async function submitNewItem() {
+    const sku = document.getElementById('itm-sku').value.trim();
+    const name = document.getElementById('itm-name').value.trim();
+    const cat = document.getElementById('itm-cat').value.trim();
+    const unit = document.getElementById('itm-unit').value.trim();
+    const cost = parseFloat(document.getElementById('itm-cost').value) || 0;
+    const price = parseFloat(document.getElementById('itm-price').value) || 0;
+    const stock = parseFloat(document.getElementById('itm-stock').value) || 0;
+    const min = parseFloat(document.getElementById('itm-min').value) || 5;
+
+    if (!sku || !name) {
+        alert("يرجى ملء رمز واسم الصنف!");
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/inventory/items', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                sku: sku,
+                name_ar: name,
+                category: cat,
+                unit: unit,
+                purchase_price: cost,
+                sale_price: price,
+                initial_stock: stock,
+                min_stock_level: min
+            })
+        });
+        const d = await res.json();
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('newItemModal')).hide();
+            alert("✅ " + d.message);
+            loadInventoryItems();
+        } else {
+            alert("❌ خطأ: " + d.error);
+        }
+    } catch(e) {
+        alert("❌ خطأ بالاتصال");
+    }
+}
+
+async function submitInventoryCount() {
+    const itemId = document.getElementById('count-item-id').value;
+    const actualQty = parseFloat(document.getElementById('count-actual-qty').value);
+
+    if (isNaN(actualQty)) {
+        alert("يرجى إدخال كمية فعلية صحيحة!");
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/inventory/count', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                item_id: itemId,
+                actual_qty: actualQty
+            })
+        });
+        const d = await res.json();
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('countModal')).hide();
+            alert("✅ " + d.message);
+            loadInventoryItems();
+        } else {
+            alert("❌ خطأ: " + d.error);
+        }
+    } catch(e) {
+        alert("❌ خطأ بالاتصال");
+    }
+}
+
+loadInventoryItems();
+</script>

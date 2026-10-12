@@ -1,0 +1,383 @@
+<div class="container-fluid p-2">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="fw-bold mb-1"><i class="fas fa-chart-line text-primary me-2"></i> القوائم والتقارير المالية الختامية</h4>
+            <p class="text-muted mb-0">ميزان المراجعة، قائمة الدخل والأرباح، الميزانية العمومية، دفتر اليومية والأستاذ، والتقرير المقارن</p>
+        </div>
+        <div>
+            <button class="btn btn-outline-secondary" onclick="window.print()">
+                <i class="fas fa-print me-1"></i> طباعة التقرير
+            </button>
+        </div>
+    </div>
+
+    <!-- Report Selector Cards -->
+    <div class="row g-2 mb-4">
+        <div class="col-md-2 col-sm-4">
+            <div class="card p-3 text-center shadow-sm border report-card active" onclick="showReport('trial_balance', this)">
+                <i class="fas fa-balance-scale text-primary fa-2x mb-2"></i>
+                <h6 class="fw-bold mb-0">ميزان المراجعة</h6>
+            </div>
+        </div>
+        <div class="col-md-2 col-sm-4">
+            <div class="card p-3 text-center shadow-sm border report-card" onclick="showReport('income_statement', this)">
+                <i class="fas fa-hand-holding-usd text-success fa-2x mb-2"></i>
+                <h6 class="fw-bold mb-0">قائمة الدخل</h6>
+            </div>
+        </div>
+        <div class="col-md-2 col-sm-4">
+            <div class="card p-3 text-center shadow-sm border report-card" onclick="showReport('balance_sheet', this)">
+                <i class="fas fa-university text-info fa-2x mb-2"></i>
+                <h6 class="fw-bold mb-0">الميزانية العمومية</h6>
+            </div>
+        </div>
+        <div class="col-md-2 col-sm-4">
+            <div class="card p-3 text-center shadow-sm border report-card" onclick="showReport('journal', this)">
+                <i class="fas fa-book text-warning fa-2x mb-2"></i>
+                <h6 class="fw-bold mb-0">دفتر اليومية العامة</h6>
+            </div>
+        </div>
+        <div class="col-md-2 col-sm-4">
+            <div class="card p-3 text-center shadow-sm border report-card" onclick="showReport('ledger', this)">
+                <i class="fas fa-file-invoice text-danger fa-2x mb-2"></i>
+                <h6 class="fw-bold mb-0">دفتر الأستاذ</h6>
+            </div>
+        </div>
+        <div class="col-md-2 col-sm-4">
+            <div class="card p-3 text-center shadow-sm border report-card" onclick="showReport('comparative', this)">
+                <i class="fas fa-chart-bar text-secondary fa-2x mb-2"></i>
+                <h6 class="fw-bold mb-0">المقارن شهرياً</h6>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Report Viewer Container -->
+    <div class="card shadow-sm border-0 p-4" id="report-content-container">
+        <div class="text-center py-4">جاري تجهيز التقرير المالي...</div>
+    </div>
+</div>
+
+<style>
+.report-card { cursor: pointer; transition: all 0.2s; }
+.report-card:hover { transform: translateY(-3px); border-color: var(--primary-color) !important; }
+.report-card.active { background: #ebf8ff; border-color: #3182ce !important; }
+</style>
+
+<script>
+let currentActiveReport = 'trial_balance';
+
+async function showReport(type, cardElem = null) {
+    currentActiveReport = type;
+    if (cardElem) {
+        document.querySelectorAll('.report-card').forEach(c => c.classList.remove('active'));
+        cardElem.classList.add('active');
+    }
+
+    const container = document.getElementById('report-content-container');
+    container.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div><div class="mt-2 text-muted">جاري الحساب والتجميع...</div></div>';
+
+    try {
+        if (type === 'trial_balance') {
+            const res = await fetch('/api/reports/trial_balance');
+            const data = await res.json();
+            renderTrialBalance(data);
+        } else if (type === 'income_statement') {
+            const res = await fetch('/api/reports/income_statement');
+            const data = await res.json();
+            renderIncomeStatement(data);
+        } else if (type === 'balance_sheet') {
+            const res = await fetch('/api/reports/balance_sheet');
+            const data = await res.json();
+            renderBalanceSheet(data);
+        } else if (type === 'journal') {
+            const res = await fetch('/api/reports/journal');
+            const data = await res.json();
+            renderGeneralJournal(data);
+        } else if (type === 'ledger') {
+            const res = await fetch('/api/reports/ledger?account=1111');
+            const data = await res.json();
+            renderGeneralLedger(data);
+        } else if (type === 'comparative') {
+            const res = await fetch('/api/reports/comparative');
+            const data = await res.json();
+            renderComparative(data);
+        }
+    } catch(err) {
+        container.innerHTML = `<div class="text-danger text-center py-4">خطأ في توليد التقرير: ${err.message}</div>`;
+    }
+}
+
+function renderTrialBalance(data) {
+    const container = document.getElementById('report-content-container');
+    const balancedBadge = data.is_balanced 
+        ? '<span class="badge bg-success fs-6"><i class="fas fa-check-circle me-1"></i> ميزان المراجعة متوازن تماماً</span>' 
+        : '<span class="badge bg-danger fs-6"><i class="fas fa-exclamation-triangle me-1"></i> يوجد فارق</span>';
+
+    container.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold mb-0">ميزان المراجعة بالأرصدة (Trial Balance)</h5>
+            ${balancedBadge}
+        </div>
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>رمز الحساب</th>
+                        <th>اسم الحساب</th>
+                        <th>النوع</th>
+                        <th class="text-end">مجموع المدين (₪)</th>
+                        <th class="text-end">مجموع الدائن (₪)</th>
+                        <th class="text-end">صافي المدين (₪)</th>
+                        <th class="text-end">صافي الدائن (₪)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.accounts.length === 0 ? '<tr><td colspan="7" class="text-center text-muted">لا توجد حركات مسجلة حتى الآن</td></tr>' :
+                    data.accounts.map(a => `
+                        <tr>
+                            <td class="font-monospace fw-bold">${a.code}</td>
+                            <td>${a.name}</td>
+                            <td>${a.type}</td>
+                            <td class="text-end">${a.total_debit.toFixed(2)}</td>
+                            <td class="text-end">${a.total_credit.toFixed(2)}</td>
+                            <td class="text-end fw-bold ${a.net_debit > 0 ? 'text-primary' : ''}">${a.net_debit.toFixed(2)}</td>
+                            <td class="text-end fw-bold ${a.net_credit > 0 ? 'text-danger' : ''}">${a.net_credit.toFixed(2)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+                <tfoot class="table-light fw-bold fs-6">
+                    <tr>
+                        <td colspan="3" class="text-center">المجموع العام:</td>
+                        <td class="text-end">${data.total_debit.toFixed(2)} ₪</td>
+                        <td class="text-end">${data.total_credit.toFixed(2)} ₪</td>
+                        <td class="text-end text-primary">${data.accounts.reduce((s,a)=>s+a.net_debit, 0).toFixed(2)} ₪</td>
+                        <td class="text-end text-danger">${data.accounts.reduce((s,a)=>s+a.net_credit, 0).toFixed(2)} ₪</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    `;
+}
+
+function renderIncomeStatement(data) {
+    const container = document.getElementById('report-content-container');
+    container.innerHTML = `
+        <h5 class="fw-bold mb-3">قائمة الدخل الشاملة والأرباح والخسائر (Income Statement)</h5>
+        <div class="row g-4">
+            <div class="col-md-7">
+                <table class="table table-bordered align-middle">
+                    <tr class="table-success fw-bold"><td colspan="2">1. الإيرادات والمبيعات التشغيلية</td></tr>
+                    <tr><td>إيرادات المبيعات والنشاط:</td><td class="text-end fw-bold">${data.sales_revenue.toFixed(2)} ₪</td></tr>
+                    <tr><td>إيرادات أخرى وفرق عملة:</td><td class="text-end">${data.other_revenue.toFixed(2)} ₪</td></tr>
+                    <tr class="fw-bold bg-light"><td>إجمالي الإيرادات:</td><td class="text-end text-success fs-6">${data.total_revenue.toFixed(2)} ₪</td></tr>
+
+                    <tr class="table-warning fw-bold"><td colspan="2">2. تكلفة المبيعات (COGS)</td></tr>
+                    <tr><td>تكلفة البضاعة المباعة:</td><td class="text-end text-danger">${data.cogs.toFixed(2)} ₪</td></tr>
+                    <tr class="fw-bold bg-light"><td>مجمل الربح (Gross Profit):</td><td class="text-end text-primary fs-6">${data.gross_profit.toFixed(2)} ₪</td></tr>
+
+                    <tr class="table-danger fw-bold"><td colspan="2">3. المصروفات التشغيلية والإدارية والمالية</td></tr>
+                    <tr><td>مصروفات تشغيلية ورواتب وإيجار ومرافق:</td><td class="text-end">${data.operating_expenses.toFixed(2)} ₪</td></tr>
+                    <tr><td>مصروفات مالية وفوائد بنكية:</td><td class="text-end">${data.financial_expenses.toFixed(2)} ₪</td></tr>
+                    <tr class="fw-bold bg-light"><td>إجمالي المصروفات:</td><td class="text-end text-danger fs-6">${data.total_expenses.toFixed(2)} ₪</td></tr>
+                </table>
+            </div>
+            <div class="col-md-5">
+                <div class="card p-4 text-center h-100 justify-content-center" style="background: ${data.net_profit >= 0 ? '#f0fff4' : '#fff5f5'}; border: 2px solid ${data.net_profit >= 0 ? '#38a169' : '#e53e3e'};">
+                    <h5 class="text-muted">صافي الربح / الخسارة للفترة</h5>
+                    <h1 class="display-5 fw-bold ${data.net_profit >= 0 ? 'text-success' : 'text-danger'} my-3">
+                        ${data.net_profit.toFixed(2)} ₪
+                    </h1>
+                    <p class="mb-0 text-muted">${data.net_profit >= 0 ? '🎉 النشاط المالي يحقق أرباحاً صافية' : '⚠️ النشاط المالي يسجل خسائر صافية'}</p>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderBalanceSheet(data) {
+    const container = document.getElementById('report-content-container');
+    const balancedBadge = data.is_balanced 
+        ? '<span class="badge bg-success fs-6"><i class="fas fa-check-circle me-1"></i> المعادلة المحاسبية متطابقة</span>' 
+        : '<span class="badge bg-danger fs-6">فارق: ' + data.difference + ' ₪</span>';
+
+    container.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold mb-0">قائمة المركز المالي والميزانية العمومية (Balance Sheet)</h5>
+            ${balancedBadge}
+        </div>
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="card p-3 border shadow-sm h-100">
+                    <h5 class="fw-bold text-primary border-bottom pb-2"><i class="fas fa-coins me-2"></i> الأصول (Assets)</h5>
+                    <div class="d-flex justify-content-between py-2 border-bottom">
+                        <span>إجمالي الأصول المتداولة والثابتة:</span>
+                        <strong class="fs-5">${data.total_assets.toFixed(2)} ₪</strong>
+                    </div>
+                    <div class="mt-auto pt-3">
+                        <div class="d-flex justify-content-between bg-primary-subtle p-3 rounded">
+                            <strong class="fs-5">مجموع جانب الأصول:</strong>
+                            <strong class="fs-5 text-primary">${data.total_assets.toFixed(2)} ₪</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card p-3 border shadow-sm h-100">
+                    <h5 class="fw-bold text-danger border-bottom pb-2"><i class="fas fa-hand-holding-usd me-2"></i> الخصوم وحقوق الملكية (Liabilities & Equity)</h5>
+                    <div class="d-flex justify-content-between py-2 border-bottom">
+                        <span>إجمالي الخصوم والالتزامات:</span>
+                        <strong>${data.total_liabilities.toFixed(2)} ₪</strong>
+                    </div>
+                    <div class="d-flex justify-content-between py-2 border-bottom">
+                        <span>حقوق الملكية (رأس المال + أرباح الفترة):</span>
+                        <strong>${data.total_equity.toFixed(2)} ₪</strong>
+                    </div>
+                    <div class="mt-auto pt-3">
+                        <div class="d-flex justify-content-between bg-danger-subtle p-3 rounded">
+                            <strong class="fs-5">مجموع الخصوم وحقوق الملكية:</strong>
+                            <strong class="fs-5 text-danger">${data.total_liabilities_and_equity.toFixed(2)} ₪</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderGeneralJournal(entries) {
+    const container = document.getElementById('report-content-container');
+    if (entries.length === 0) {
+        container.innerHTML = '<h5 class="fw-bold mb-3">دفتر اليومية العامة</h5><div class="text-center py-4 text-muted">لا توجد قيود مسجلة بعد</div>';
+        return;
+    }
+    container.innerHTML = `
+        <h5 class="fw-bold mb-3">دفتر اليومية العامة (General Journal)</h5>
+        ${entries.map(e => `
+            <div class="card mb-3 border shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="badge bg-primary font-monospace me-2">${e.entry_no}</span>
+                        <strong>${e.description}</strong>
+                        ${e.reference_no ? '<span class="text-muted ms-2">(مرجع: ' + e.reference_no + ')</span>' : ''}
+                    </div>
+                    <div>
+                        <span class="badge bg-secondary me-2">${e.source_module}</span>
+                        <span class="text-muted small">${e.date}</span>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-sm table-bordered mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>رمز الحساب</th>
+                                <th>اسم الحساب</th>
+                                <th>البيان الفرعي</th>
+                                <th class="text-end" style="width: 140px;">مدين (₪)</th>
+                                <th class="text-end" style="width: 140px;">دائن (₪)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${e.lines.map(l => `
+                                <tr>
+                                    <td class="font-monospace">${l.account_code}</td>
+                                    <td>${l.account_name} ${l.contact_name ? '<span class="badge bg-light text-dark border">[' + l.contact_name + ']</span>' : ''}</td>
+                                    <td class="text-muted small">${l.note}</td>
+                                    <td class="text-end fw-bold ${l.debit > 0 ? 'text-primary' : ''}">${l.debit > 0 ? l.debit.toFixed(2) : '-'}</td>
+                                    <td class="text-end fw-bold ${l.credit > 0 ? 'text-danger' : ''}">${l.credit > 0 ? l.credit.toFixed(2) : '-'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                        <tfoot class="table-light fw-bold">
+                            <tr>
+                                <td colspan="3" class="text-end">إجمالي القيد:</td>
+                                <td class="text-end text-primary">${e.total_debit.toFixed(2)} ₪</td>
+                                <td class="text-end text-danger">${e.total_credit.toFixed(2)} ₪</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        `).join('')}
+    `;
+}
+
+function renderGeneralLedger(data) {
+    const container = document.getElementById('report-content-container');
+    container.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h5 class="fw-bold mb-1">دفتر الأستاذ العام (General Ledger)</h5>
+                <p class="text-muted mb-0">الحساب: <b>${data.account_name} (${data.account_code})</b> - نوع: ${data.account_type}</p>
+            </div>
+            <div>
+                <span class="badge bg-primary px-3 py-2 fs-6">الرصيد الختامي: ${data.closing_balance.toFixed(2)} ₪</span>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>التاريخ</th>
+                        <th>رقم القيد</th>
+                        <th>البيان</th>
+                        <th class="text-end">مدين (₪)</th>
+                        <th class="text-end">دائن (₪)</th>
+                        <th class="text-end">الرصيد المتراكم (₪)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="3" class="fw-bold">الرصيد الافتتاحي:</td>
+                        <td colspan="2"></td>
+                        <td class="text-end fw-bold">${data.opening_balance.toFixed(2)}</td>
+                    </tr>
+                    ${data.lines.length === 0 ? '<tr><td colspan="6" class="text-center text-muted">لا توجد حركات مسجلة لهذا الحساب</td></tr>' :
+                    data.lines.map(l => `
+                        <tr>
+                            <td>${l.date}</td>
+                            <td class="font-monospace text-primary">${l.entry_no}</td>
+                            <td>${l.desc} ${l.note ? '<small class="text-muted">(' + l.note + ')</small>' : ''}</td>
+                            <td class="text-end ${l.debit > 0 ? 'fw-bold text-primary' : ''}">${l.debit > 0 ? l.debit.toFixed(2) : '-'}</td>
+                            <td class="text-end ${l.credit > 0 ? 'fw-bold text-danger' : ''}">${l.credit > 0 ? l.credit.toFixed(2) : '-'}</td>
+                            <td class="text-end fw-bold fs-6">${l.balance.toFixed(2)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function renderComparative(data) {
+    const container = document.getElementById('report-content-container');
+    container.innerHTML = `
+        <h5 class="fw-bold mb-3">الأداء المالي المقارن شهرياً لسنة ${data.year} (Month-by-Month)</h5>
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped text-center align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>الشهر</th>
+                        <th>إجمالي الإيرادات (₪)</th>
+                        <th>إجمالي المصروفات (₪)</th>
+                        <th>صافي الأرباح (₪)</th>
+                        <th>الحالة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.months.map(m => `
+                        <tr>
+                            <td class="fw-bold">${m.month_name}</td>
+                            <td class="text-success fw-bold">${m.revenue.toFixed(2)}</td>
+                            <td class="text-danger fw-bold">${m.expenses.toFixed(2)}</td>
+                            <td class="fw-bold fs-6 ${m.net_profit >= 0 ? 'text-primary' : 'text-danger'}">${m.net_profit.toFixed(2)}</td>
+                            <td><span class="badge ${m.net_profit >= 0 ? 'bg-success' : 'bg-danger'}">${m.net_profit >= 0 ? 'ربح' : 'عجز'}</span></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+showReport('trial_balance');
+</script>

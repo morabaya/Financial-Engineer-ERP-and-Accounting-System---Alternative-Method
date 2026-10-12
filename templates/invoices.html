@@ -1,0 +1,328 @@
+<div class="container-fluid p-2">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="fw-bold mb-1"><i class="fas fa-file-invoice-dollar text-primary me-2"></i> إدارة الفواتير والمردودات (Invoicing & Tax)</h4>
+            <p class="text-muted mb-0">فواتير المبيعات، فواتير المشتريات، والمردودات مع الاحتساب الآلي لضريبة القيمة المضافة 16% وقيد تكلفة المبيعات (COGS)</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary" onclick="openNewInvoiceModal('Sales')">
+                <i class="fas fa-plus me-1"></i> فاتورة مبيعات جديدة
+            </button>
+            <button class="btn btn-secondary" onclick="openNewInvoiceModal('Purchase')">
+                <i class="fas fa-shopping-cart me-1"></i> فاتورة مشتريات جديدة
+            </button>
+        </div>
+    </div>
+
+    <!-- Filter Buttons -->
+    <div class="btn-group mb-3" role="group">
+        <button type="button" class="btn btn-outline-secondary active" onclick="loadInvoices('', this)">جميع الفواتير</button>
+        <button type="button" class="btn btn-outline-secondary" onclick="loadInvoices('Sales', this)">فواتير المبيعات</button>
+        <button type="button" class="btn btn-outline-secondary" onclick="loadInvoices('Purchase', this)">فواتير المشتريات</button>
+        <button type="button" class="btn btn-outline-secondary" onclick="loadInvoices('Sales_Return', this)">مردودات مبيعات</button>
+        <button type="button" class="btn btn-outline-secondary" onclick="loadInvoices('Purchase_Return', this)">مردودات مشتريات</button>
+    </div>
+
+    <!-- Invoices Table -->
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>رقم الفاتورة</th>
+                            <th>النوع</th>
+                            <th>التاريخ</th>
+                            <th>العميل / المورد</th>
+                            <th>طريقة الدفع</th>
+                            <th>المبلغ قبل الضريبة</th>
+                            <th>ضريبة 16%</th>
+                            <th>الإجمالي الكلي</th>
+                            <th>الحالة</th>
+                        </tr>
+                    </thead>
+                    <tbody id="invoices-table-body">
+                        <tr><td colspan="9" class="text-center py-4">جاري تحميل الفواتير...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: New Invoice -->
+<div class="modal fade" id="newInvoiceModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="invoiceModalTitle"><i class="fas fa-file-invoice me-2"></i> إصدار فاتورة جديدة</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="invoiceForm">
+                    <input type="hidden" id="inv-type" value="Sales">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-5">
+                            <label class="form-label fw-bold">العميل / المورد:</label>
+                            <select id="inv-contact" class="form-select" required>
+                                <!-- populated -->
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">طريقة السداد:</label>
+                            <select id="inv-payment-method" class="form-select">
+                                <option value="Credit">آجل (على حساب الذمم)</option>
+                                <option value="Cash" selected>نقداً (الصندوق الرئيسي)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">العملة:</label>
+                            <select id="inv-currency" class="form-select">
+                                <option value="ILS" selected>شيكل (ILS ₪)</option>
+                                <option value="USD">دولار (USD $)</option>
+                                <option value="JOD">دينار (JOD JD)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Invoice Items Table -->
+                    <div class="card p-3 mb-3 bg-light border-0">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold mb-0">بنود وأصناف الفاتورة:</h6>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addInvoiceItemRow()">
+                                <i class="fas fa-plus me-1"></i> إضافة صنف
+                            </button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-bordered bg-white align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 35%;">الصنف</th>
+                                        <th style="width: 15%;">الكمية</th>
+                                        <th style="width: 20%;">سعر الوحدة</th>
+                                        <th style="width: 15%;">الضريبة (16%)</th>
+                                        <th style="width: 15%;">الإجمالي</th>
+                                        <th style="width: 50px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="invoice-items-rows">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Summary & Totals -->
+                    <div class="row justify-content-end">
+                        <div class="col-md-5">
+                            <div class="card p-3 bg-light border-0">
+                                <div class="d-flex justify-content-between py-1">
+                                    <span>المجموع قبل الضريبة:</span>
+                                    <strong id="inv-subtotal">0.00 ₪</strong>
+                                </div>
+                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                    <span>ضريبة القيمة المضافة (16%):</span>
+                                    <strong class="text-danger" id="inv-tax">0.00 ₪</strong>
+                                </div>
+                                <div class="d-flex justify-content-between pt-2">
+                                    <span class="fs-5 fw-bold">الإجمالي النهائي:</span>
+                                    <h4 class="fw-bold text-primary mb-0" id="inv-grand-total">0.00 ₪</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" onclick="submitNewInvoice()">
+                    <i class="fas fa-save me-1"></i> حفظ وترحيل الفاتورة
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let invContactsCache = [];
+let invItemsCache = [];
+
+async function loadInvoices(type = '', btnElem = null) {
+    if (btnElem) {
+        document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+        btnElem.classList.add('active');
+    }
+    try {
+        const url = type ? `/api/invoices?type=${type}` : '/api/invoices';
+        const res = await fetch(url);
+        const list = await res.json();
+        const tbody = document.getElementById('invoices-table-body');
+
+        if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">لا توجد فواتير مسجلة</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = list.map(inv => {
+            const typeLabels = {
+                'Sales': '<span class="badge bg-success">فاتورة مبيعات</span>',
+                'Purchase': '<span class="badge bg-secondary">فاتورة مشتريات</span>',
+                'Sales_Return': '<span class="badge bg-warning text-dark">مردود مبيعات</span>',
+                'Purchase_Return': '<span class="badge bg-danger">مردود مشتريات</span>'
+            };
+            return `
+                <tr>
+                    <td class="fw-bold font-monospace text-primary">${inv.invoice_no}</td>
+                    <td>${typeLabels[inv.type] || inv.type}</td>
+                    <td>${inv.date}</td>
+                    <td>${inv.contact_name}</td>
+                    <td><span class="badge bg-light text-dark border">${inv.payment_method === 'Cash' ? 'نقدي' : 'آجل'}</span></td>
+                    <td class="fw-bold">${Number(inv.total_before_tax).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                    <td class="text-danger fw-bold">${Number(inv.tax_amount).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                    <td class="fw-bold text-success fs-6">${Number(inv.total_after_tax).toLocaleString('en-US', {minimumFractionDigits: 2})} ${inv.currency}</td>
+                    <td><span class="badge ${inv.status === 'Paid' ? 'bg-success' : 'bg-warning text-dark'}">${inv.status === 'Paid' ? 'مدفوعة' : 'غير مسددة'}</span></td>
+                </tr>
+            `;
+        }).join('');
+    } catch(e) {
+        document.getElementById('invoices-table-body').innerHTML = '<tr><td colspan="9" class="text-center text-danger">خطأ في تحميل الفواتير</td></tr>';
+    }
+}
+
+async function prepareInvoiceData() {
+    if (invContactsCache.length === 0) {
+        const r1 = await fetch('/api/contacts');
+        invContactsCache = await r1.json();
+    }
+    if (invItemsCache.length === 0) {
+        const r2 = await fetch('/api/inventory/items');
+        invItemsCache = await r2.json();
+    }
+}
+
+async function openNewInvoiceModal(type) {
+    await prepareInvoiceData();
+    document.getElementById('inv-type').value = type;
+    document.getElementById('invoiceModalTitle').innerText = type === 'Sales' ? 'إصدار فاتورة مبيعات جديدة' : 'إصدار فاتورة مشتريات جديدة';
+
+    // Populate contacts
+    const select = document.getElementById('inv-contact');
+    select.innerHTML = invContactsCache.map(c => `<option value="${c.id}">${c.name} (${c.type})</option>`).join('');
+
+    // Clear and add first item row
+    document.getElementById('invoice-items-rows').innerHTML = '';
+    addInvoiceItemRow();
+
+    new bootstrap.Modal(document.getElementById('newInvoiceModal')).show();
+}
+
+function addInvoiceItemRow() {
+    const tbody = document.getElementById('invoice-items-rows');
+    const rowId = 'row-' + Date.now();
+    const itemOptions = invItemsCache.map(it => `<option value="${it.id}" data-price="${it.sale_price}" data-cost="${it.purchase_price}">${it.name_ar} (متوفر: ${it.current_stock})</option>`).join('');
+
+    const tr = document.createElement('tr');
+    tr.id = rowId;
+    tr.innerHTML = `
+        <td>
+            <select class="form-select form-select-sm item-select" onchange="onItemRowChange('${rowId}')">
+                <option value="">-- اختر الصنف --</option>
+                ${itemOptions}
+            </select>
+        </td>
+        <td><input type="number" step="1" value="1" min="1" class="form-control form-control-sm qty-input" oninput="calculateInvoiceTotals()"></td>
+        <td><input type="number" step="0.01" value="0.00" class="form-control form-control-sm price-input" oninput="calculateInvoiceTotals()"></td>
+        <td class="text-danger fw-bold tax-cell">0.00 ₪</td>
+        <td class="fw-bold line-total-cell">0.00 ₪</td>
+        <td class="text-center"><button type="button" class="btn btn-sm btn-outline-danger" onclick="document.getElementById('${rowId}').remove(); calculateInvoiceTotals();">&times;</button></td>
+    `;
+    tbody.appendChild(tr);
+}
+
+function onItemRowChange(rowId) {
+    const row = document.getElementById(rowId);
+    const select = row.querySelector('.item-select');
+    const selectedOpt = select.options[select.selectedIndex];
+    const isSales = document.getElementById('inv-type').value === 'Sales';
+    const price = selectedOpt.getAttribute(isSales ? 'data-price' : 'data-cost') || '0.00';
+    row.querySelector('.price-input').value = price;
+    calculateInvoiceTotals();
+}
+
+function calculateInvoiceTotals() {
+    let subtotal = 0;
+    let totalTax = 0;
+
+    document.querySelectorAll('#invoice-items-rows tr').forEach(row => {
+        const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
+        const price = parseFloat(row.querySelector('.price-input').value) || 0;
+        const lineSubtotal = qty * price;
+        const lineTax = lineSubtotal * 0.16; // 16% Palestinian VAT
+        const lineTotal = lineSubtotal + lineTax;
+
+        row.querySelector('.tax-cell').innerText = lineTax.toFixed(2) + ' ₪';
+        row.querySelector('.line-total-cell').innerText = lineTotal.toFixed(2) + ' ₪';
+
+        subtotal += lineSubtotal;
+        totalTax += lineTax;
+    });
+
+    const grandTotal = subtotal + totalTax;
+    document.getElementById('inv-subtotal').innerText = subtotal.toFixed(2) + ' ₪';
+    document.getElementById('inv-tax').innerText = totalTax.toFixed(2) + ' ₪';
+    document.getElementById('inv-grand-total').innerText = grandTotal.toFixed(2) + ' ₪';
+}
+
+async function submitNewInvoice() {
+    const type = document.getElementById('inv-type').value;
+    const contactId = document.getElementById('inv-contact').value;
+    const payMethod = document.getElementById('inv-payment-method').value;
+    const currency = document.getElementById('inv-currency').value;
+
+    const items = [];
+    document.querySelectorAll('#invoice-items-rows tr').forEach(row => {
+        const itemId = row.querySelector('.item-select').value;
+        const qty = parseFloat(row.querySelector('.qty-input').value);
+        const price = parseFloat(row.querySelector('.price-input').value);
+        if (itemId && qty > 0) {
+            items.push({
+                item_id: parseInt(itemId),
+                quantity: qty,
+                unit_price: price,
+                tax_rate: 0.16
+            });
+        }
+    });
+
+    if (items.length === 0) {
+        alert("يرجى إضافة صنف واحد على الأقل للفاتورة!");
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/invoices', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                type: type,
+                contact_id: contactId ? parseInt(contactId) : null,
+                payment_method: payMethod,
+                currency: currency,
+                items: items
+            })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('newInvoiceModal')).hide();
+            alert("✅ " + data.message);
+            loadInvoices();
+        } else {
+            alert("❌ خطأ: " + data.error);
+        }
+    } catch(err) {
+        alert("❌ خطأ بالاتصال");
+    }
+}
+
+loadInvoices();
+</script>

@@ -1,0 +1,234 @@
+<div class="container-fluid p-2">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="fw-bold mb-1"><i class="fas fa-cash-register text-primary me-2"></i> نقطة البيع السريعة (POS Terminal)</h4>
+            <p class="text-muted mb-0">واجهة كاشير فائقة السرعة للمبيعات المباشرة مع خصم فوري من المخزون والاحتساب التلقائي لضريبة 16%</p>
+        </div>
+        <div>
+            <span class="badge bg-success px-3 py-2 fs-6"><i class="fas fa-circle me-1 small"></i> الصندوق: متصل ومفتوح</span>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- Products Grid & Search (Left side in RTL) -->
+        <div class="col-md-7">
+            <div class="card p-3 shadow-sm border-0 mb-3">
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="fas fa-barcode"></i></span>
+                    <input type="text" id="pos-search" class="form-control" placeholder="امسح الباركود أو ابحث باسم الصنف..." oninput="filterPosItems()">
+                </div>
+            </div>
+
+            <!-- Products Cards Container -->
+            <div class="row g-2" id="pos-products-grid" style="max-height: 520px; overflow-y: auto;">
+                <div class="col-12 text-center py-4 text-muted">جاري تحميل الأصناف...</div>
+            </div>
+        </div>
+
+        <!-- Cart & Checkout (Right side in RTL) -->
+        <div class="col-md-5">
+            <div class="card p-3 shadow-sm border-0 h-100 d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-center pb-2 border-bottom mb-2">
+                    <h5 class="fw-bold mb-0"><i class="fas fa-shopping-cart text-primary me-2"></i> سلة المبيعات</h5>
+                    <button class="btn btn-sm btn-outline-danger" onclick="clearPosCart()"><i class="fas fa-trash me-1"></i> إفراغ السلة</button>
+                </div>
+
+                <!-- Items Table -->
+                <div class="table-responsive flex-grow-1" style="max-height: 280px; overflow-y: auto;">
+                    <table class="table table-sm align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>الصنف</th>
+                                <th style="width: 80px;">الكمية</th>
+                                <th>السعر</th>
+                                <th>الإجمالي</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="pos-cart-tbody">
+                            <tr><td colspan="5" class="text-center text-muted py-4">السلة فارغة. اختر صنفاً للبدء.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Totals Section -->
+                <div class="p-3 bg-light rounded mt-3">
+                    <div class="d-flex justify-content-between py-1">
+                        <span>المجموع الصافي:</span>
+                        <strong id="pos-subtotal">0.00 ₪</strong>
+                    </div>
+                    <div class="d-flex justify-content-between py-1 border-bottom">
+                        <span>ضريبة القيمة المضافة (16%):</span>
+                        <strong class="text-danger" id="pos-tax">0.00 ₪</strong>
+                    </div>
+                    <div class="d-flex justify-content-between pt-2">
+                        <span class="fs-5 fw-bold">المطلوب للدفع:</span>
+                        <h3 class="fw-bold text-success mb-0" id="pos-grand-total">0.00 ₪</h3>
+                    </div>
+                </div>
+
+                <!-- Checkout Actions -->
+                <div class="d-grid gap-2 mt-3">
+                    <button class="btn btn-success btn-lg fw-bold" onclick="executePosCheckout('Cash')">
+                        <i class="fas fa-money-bill-wave me-2"></i> إتمام البيع نقداً (كاش)
+                    </button>
+                    <button class="btn btn-outline-primary" onclick="executePosCheckout('Credit')">
+                        <i class="fas fa-user-clock me-2"></i> بيع آجل (على حساب الزبون)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let posAvailableItems = [];
+let posCart = {}; // { itemId: { item, qty } }
+
+async function initPos() {
+    try {
+        const res = await fetch('/api/inventory/items');
+        posAvailableItems = await res.json();
+        renderPosProducts(posAvailableItems);
+    } catch(e) {
+        document.getElementById('pos-products-grid').innerHTML = '<div class="col-12 text-center text-danger">خطأ في تحميل الأصناف</div>';
+    }
+}
+
+function renderPosProducts(items) {
+    const grid = document.getElementById('pos-products-grid');
+    if (items.length === 0) {
+        grid.innerHTML = '<div class="col-12 text-center text-muted">لا توجد أصناف مطابقة</div>';
+        return;
+    }
+
+    grid.innerHTML = items.map(it => `
+        <div class="col-md-4 col-sm-6">
+            <div class="card p-2 shadow-sm border h-100 text-center" style="cursor: pointer; transition: 0.2s;" onclick="addToPosCart(${it.id})" onmouseover="this.classList.add('border-primary')" onmouseout="this.classList.remove('border-primary')">
+                <div class="fw-bold text-truncate" title="${it.name_ar}">${it.name_ar}</div>
+                <div class="text-muted small font-monospace">${it.sku}</div>
+                <div class="mt-2 d-flex justify-content-between align-items-center">
+                    <span class="badge bg-light text-dark border">المخزون: ${it.current_stock}</span>
+                    <strong class="text-primary fs-6">${it.sale_price} ₪</strong>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function filterPosItems() {
+    const q = document.getElementById('pos-search').value.toLowerCase().trim();
+    const filtered = posAvailableItems.filter(it => it.name_ar.toLowerCase().includes(q) || it.sku.toLowerCase().includes(q));
+    renderPosProducts(filtered);
+}
+
+function addToPosCart(itemId) {
+    const item = posAvailableItems.find(i => i.id === itemId);
+    if (!item) return;
+
+    if (posCart[itemId]) {
+        posCart[itemId].qty += 1;
+    } else {
+        posCart[itemId] = { item: item, qty: 1 };
+    }
+    renderPosCart();
+}
+
+function updateCartQty(itemId, change) {
+    if (!posCart[itemId]) return;
+    posCart[itemId].qty += change;
+    if (posCart[itemId].qty <= 0) {
+        delete posCart[itemId];
+    }
+    renderPosCart();
+}
+
+function clearPosCart() {
+    posCart = {};
+    renderPosCart();
+}
+
+function renderPosCart() {
+    const tbody = document.getElementById('pos-cart-tbody');
+    const keys = Object.keys(posCart);
+
+    if (keys.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">السلة فارغة. اختر صنفاً للبدء.</td></tr>';
+        document.getElementById('pos-subtotal').innerText = '0.00 ₪';
+        document.getElementById('pos-tax').innerText = '0.00 ₪';
+        document.getElementById('pos-grand-total').innerText = '0.00 ₪';
+        return;
+    }
+
+    let subtotal = 0;
+    tbody.innerHTML = keys.map(k => {
+        const line = posCart[k];
+        const lineTotal = line.qty * line.item.sale_price;
+        subtotal += lineTotal;
+        return `
+            <tr>
+                <td class="fw-bold text-truncate" style="max-width: 140px;">${line.item.name_ar}</td>
+                <td>
+                    <div class="d-flex align-items-center gap-1">
+                        <button class="btn btn-sm btn-light border px-2 py-0" onclick="updateCartQty(${line.item.id}, -1)">-</button>
+                        <span class="fw-bold">${line.qty}</span>
+                        <button class="btn btn-sm btn-light border px-2 py-0" onclick="updateCartQty(${line.item.id}, 1)">+</button>
+                    </div>
+                </td>
+                <td>${line.item.sale_price}</td>
+                <td class="fw-bold">${lineTotal.toFixed(2)}</td>
+                <td><button class="btn btn-sm text-danger" onclick="delete posCart[${line.item.id}]; renderPosCart();">&times;</button></td>
+            </tr>
+        `;
+    }).join('');
+
+    const tax = subtotal * 0.16; // 16% Palestinian VAT
+    const grandTotal = subtotal + tax;
+
+    document.getElementById('pos-subtotal').innerText = subtotal.toFixed(2) + ' ₪';
+    document.getElementById('pos-tax').innerText = tax.toFixed(2) + ' ₪';
+    document.getElementById('pos-grand-total').innerText = grandTotal.toFixed(2) + ' ₪';
+}
+
+async function executePosCheckout(paymentMethod) {
+    const keys = Object.keys(posCart);
+    if (keys.length === 0) {
+        alert("سلة المشتريات فارغة!");
+        return;
+    }
+
+    const items = keys.map(k => ({
+        item_id: posCart[k].item.id,
+        quantity: posCart[k].qty,
+        unit_price: posCart[k].item.sale_price,
+        tax_rate: 0.16
+    }));
+
+    try {
+        const res = await fetch('/api/invoices', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                type: 'Sales',
+                contact_id: 1, // زبون نقدي افتراضياً
+                payment_method: paymentMethod,
+                currency: 'ILS',
+                items: items,
+                notes: 'فاتورة نقطة بيع POS سريعة'
+            })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert(`🎉 تم إتمام عملية البيع بنجاح!\nرقم الفاتورة: ${data.invoice.invoice_no}\nالإجمالي: ${data.invoice.total_after_tax} ₪ (شاملة ضريبة 16%)\nتم تحديث المخزون وقيد الصندوق.`);
+            clearPosCart();
+            initPos(); // refresh stock numbers
+        } else {
+            alert("❌ خطأ: " + data.error);
+        }
+    } catch(e) {
+        alert("❌ خطأ بالاتصال");
+    }
+}
+
+initPos();
+</script>

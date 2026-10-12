@@ -1,0 +1,276 @@
+<div class="container-fluid p-2">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="fw-bold mb-1"><i class="fas fa-file-invoice text-primary me-2"></i> إدارة السندات المالية (Vouchers)</h4>
+            <p class="text-muted mb-0">سندات القبض (R)، سندات الصرف (P)، وسندات القيد اليومية (E) مع الترقيم التسلسلي الآلي</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-success" onclick="openNewVoucherModal('Receipt')">
+                <i class="fas fa-plus me-1"></i> سند قبض جديد (R)
+            </button>
+            <button class="btn btn-danger" onclick="openNewVoucherModal('Payment')">
+                <i class="fas fa-minus me-1"></i> سند صرف جديد (P)
+            </button>
+            <button class="btn btn-primary" onclick="openNewVoucherModal('Journal')">
+                <i class="fas fa-balance-scale me-1"></i> سند قيد جديد (E)
+            </button>
+        </div>
+    </div>
+
+    <!-- Filter Buttons -->
+    <div class="btn-group mb-3" role="group">
+        <button type="button" class="btn btn-outline-secondary active" onclick="filterVouchers('', this)">جميع السندات</button>
+        <button type="button" class="btn btn-outline-secondary" onclick="filterVouchers('Receipt', this)">سندات القبض (R)</button>
+        <button type="button" class="btn btn-outline-secondary" onclick="filterVouchers('Payment', this)">سندات الصرف (P)</button>
+        <button type="button" class="btn btn-outline-secondary" onclick="filterVouchers('Journal', this)">سندات القيد (E)</button>
+    </div>
+
+    <!-- Vouchers Table -->
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>رقم السند</th>
+                            <th>التاريخ</th>
+                            <th>نوع السند</th>
+                            <th>البيان / الشرح</th>
+                            <th>جهة التعامل</th>
+                            <th>المبلغ</th>
+                            <th>العملة</th>
+                        </tr>
+                    </thead>
+                    <tbody id="vouchers-table-body">
+                        <tr><td colspan="7" class="text-center py-4">جاري تحميل السندات...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: New Voucher -->
+<div class="modal fade" id="newVoucherModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="voucherModalTitle"><i class="fas fa-file-signature me-2"></i> إصدار سند مالي جديد</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="voucherForm">
+                    <input type="hidden" id="v-type" value="Receipt">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">المبلغ:</label>
+                            <input type="number" step="0.01" id="v-amount" class="form-control form-control-lg" required placeholder="0.00">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">العملة:</label>
+                            <select id="v-currency" class="form-select" onchange="updateVoucherRate()">
+                                <option value="ILS" selected>شيكل (ILS)</option>
+                                <option value="USD">دولار (USD)</option>
+                                <option value="JOD">دينار (JOD)</option>
+                                <option value="EUR">يورو (EUR)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">سعر الصرف:</label>
+                            <input type="number" step="0.001" id="v-rate" class="form-control" value="1.0">
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold" id="v-target-account-label">الحساب المقابل:</label>
+                            <select id="v-account-code" class="form-select" required>
+                                <!-- Populated dynamically from CoA -->
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">جهة التعامل (اختياري للعملاء/الموردين):</label>
+                            <select id="v-contact-id" class="form-select">
+                                <option value="">-- بدون جهة تعامل --</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">البيان / تفاصيل العملية:</label>
+                        <input type="text" id="v-description" class="form-control" required placeholder="مثال: دفعة تحت الحساب / سداد مصاريف كهرباء...">
+                    </div>
+
+                    <div class="alert alert-info py-2" id="voucher-double-entry-hint">
+                        <i class="fas fa-info-circle me-1"></i> سيقوم النظام آلياً بتسجيل قيد مزدوج متوازن في دفتر اليومية العامة.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" onclick="submitNewVoucher()">
+                    <i class="fas fa-check-circle me-1"></i> اعتماد وترحيل السند
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentVoucherFilter = '';
+let cachedAccounts = [];
+let cachedContacts = [];
+
+async function loadVouchers(vType = '') {
+    try {
+        const url = vType ? `/api/vouchers?type=${vType}` : '/api/vouchers';
+        const res = await fetch(url);
+        const list = await res.json();
+        const tbody = document.getElementById('vouchers-table-body');
+
+        if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">لا توجد سندات مسجلة</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = list.map(v => {
+            const badgeClass = v.type === 'Receipt' ? 'bg-success' : (v.type === 'Payment' ? 'bg-danger' : 'bg-primary');
+            return `
+                <tr>
+                    <td class="fw-bold font-monospace text-primary">${v.voucher_no}</td>
+                    <td>${v.date}</td>
+                    <td><span class="badge ${badgeClass}">${v.type_ar}</span></td>
+                    <td>${v.description}</td>
+                    <td>${v.contact_name ? '<span class="badge bg-light text-dark border">' + v.contact_name + '</span>' : '-'}</td>
+                    <td class="fw-bold fs-6">${Number(v.total_amount).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                    <td><span class="badge bg-secondary">${v.currency}</span></td>
+                </tr>
+            `;
+        }).join('');
+    } catch(e) {
+        document.getElementById('vouchers-table-body').innerHTML = '<tr><td colspan="7" class="text-center text-danger">خطأ في تحميل السندات</td></tr>';
+    }
+}
+
+function filterVouchers(type, btn) {
+    document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    loadVouchers(type);
+}
+
+async function prepareVoucherModalData() {
+    if (cachedAccounts.length === 0) {
+        const r1 = await fetch('/api/accounts');
+        cachedAccounts = await r1.json();
+    }
+    if (cachedContacts.length === 0) {
+        const r2 = await fetch('/api/contacts');
+        cachedContacts = await r2.json();
+    }
+
+    const accSelect = document.getElementById('v-account-code');
+    const leafAccs = cachedAccounts.filter(a => a.is_leaf);
+    accSelect.innerHTML = leafAccs.map(a => `<option value="${a.code}">${a.code} - ${a.name_ar} (${a.type})</option>`).join('');
+
+    const contactSelect = document.getElementById('v-contact-id');
+    contactSelect.innerHTML = '<option value="">-- بدون جهة تعامل --</option>' + 
+        cachedContacts.map(c => `<option value="${c.id}">${c.name} (${c.type})</option>`).join('');
+}
+
+function updateVoucherRate() {
+    const cur = document.getElementById('v-currency').value;
+    const rates = {'ILS': 1.0, 'USD': 3.65, 'JOD': 5.15, 'EUR': 3.95};
+    document.getElementById('v-rate').value = rates[cur] || 1.0;
+}
+
+function openNewVoucherModal(type) {
+    document.getElementById('v-type').value = type;
+    const titles = {
+        'Receipt': 'إصدار سند قبض جديد (R) - استلام نقدية',
+        'Payment': 'إصدار سند صرف جديد (P) - دفع نقدية أو مصاريف',
+        'Journal': 'إصدار سند قيد تسوية (E)'
+    };
+    document.getElementById('voucherModalTitle').innerText = titles[type];
+
+    prepareVoucherModalData().then(() => {
+        const accSelect = document.getElementById('v-account-code');
+        if (type === 'Receipt') {
+            accSelect.value = '1121'; // حسابات العملاء افتراضياً
+        } else if (type === 'Payment') {
+            accSelect.value = '525'; // مصاريف عامة افتراضياً
+        }
+        const modal = new bootstrap.Modal(document.getElementById('newVoucherModal'));
+        modal.show();
+    });
+}
+
+async function submitNewVoucher() {
+    const type = document.getElementById('v-type').value;
+    const amount = parseFloat(document.getElementById('v-amount').value);
+    const currency = document.getElementById('v-currency').value;
+    const rate = parseFloat(document.getElementById('v-rate').value);
+    const targetAccCode = document.getElementById('v-account-code').value;
+    const contactId = document.getElementById('v-contact-id').value;
+    const desc = document.getElementById('v-description').value;
+
+    if (!amount || amount <= 0) {
+        alert("يرجى إدخال مبلغ صحيح!");
+        return;
+    }
+    if (!desc) {
+        alert("يرجى إدخال بيان السند!");
+        return;
+    }
+
+    // تجهيز طرفي القيد المزدوج المتوازن
+    let lines = [];
+    if (type === 'Receipt') {
+        // سند قبض: من حـ/ الصندوق (1111) إلى حـ/ الحساب المستهدف (العميل مثلاً)
+        lines = [
+            {'account_code': '1111', 'debit': amount, 'credit': 0.0, 'note': desc},
+            {'account_code': targetAccCode, 'contact_id': contactId || null, 'debit': 0.0, 'credit': amount, 'note': desc}
+        ];
+    } else if (type === 'Payment') {
+        // سند صرف: من حـ/ الحساب المستهدف (المصروف أو المورد) إلى حـ/ الصندوق (1111)
+        lines = [
+            {'account_code': targetAccCode, 'contact_id': contactId || null, 'debit': amount, 'credit': 0.0, 'note': desc},
+            {'account_code': '1111', 'debit': 0.0, 'credit': amount, 'note': desc}
+        ];
+    } else {
+        // سند قيد
+        lines = [
+            {'account_code': targetAccCode, 'contact_id': contactId || null, 'debit': amount, 'credit': 0.0, 'note': desc},
+            {'account_code': '1111', 'debit': 0.0, 'credit': amount, 'note': desc}
+        ];
+    }
+
+    try {
+        const res = await fetch('/api/vouchers', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                type: type,
+                total_amount: amount,
+                currency: currency,
+                exchange_rate: rate,
+                description: desc,
+                contact_id: contactId || null,
+                lines: lines
+            })
+        });
+        const result = await res.json();
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('newVoucherModal')).hide();
+            document.getElementById('voucherForm').reset();
+            alert("✅ " + result.message);
+            loadVouchers();
+        } else {
+            alert("❌ خطأ: " + (result.error || "تعذر حفظ السند"));
+        }
+    } catch(err) {
+        alert("❌ خطأ بالاتصال: " + err.message);
+    }
+}
+
+loadVouchers();
+</script>
